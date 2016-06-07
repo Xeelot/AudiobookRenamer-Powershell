@@ -1,11 +1,13 @@
 # Set initial values before running batch
 $files = Get-ChildItem -Filter *.mp3 -Path e:\Downloads\RedRising
-$wmp = New-Object -ComObject wmplayer.ocx
 $bookname = 'RedRising'
 $author = 'Pierce Brown'
-$booktitle = "Red Rising"
+$booktitle = 'Red Rising'
 $i = 1;
 $firstPR = $true
+
+# Load TagLib for editing metadata
+[Reflection.Assembly]::LoadFrom('E:\Powershell\taglib\Libraries\taglib-sharp.dll') | Out-Null
 
 foreach($file in $files) {
    # Gather info by splitting strings
@@ -13,33 +15,34 @@ foreach($file in $files) {
    $fileshortname = $file.Name.Split(".")[0]
    $bookid        = $fileshortname.Split("_")[0]
    $filenumber    = $fileshortname.Split("_")[1]
-   
    Write-Host "Modifying $fileshortname to ${bookname}_${filenumber}"
-   # Load the file using WM Player and set metadata
-   $metadata = $wmp.newMedia($filename)
+
+   # Load the file using TagLib
+   $tagfile = [TagLib.File]::Create($file.FullName)
    
    if($filenumber -like "*PRE*") {
-      $metadata.setItemInfo('Title', 'The Preface')
+      $tagfile.Tag.Title = 'The Preface'
       $booktype = '_'
    }
    else {
       $booktype = $fileshortname.Split("_")[2]
    }
    
-   $metadata.setItemInfo('WM/TrackNumber', $i)
-   $metadata.setItemInfo('AlbumArtist', $author)
-   $metadata.setItemInfo('Artist', $author)
-   $metadata.setItemInfo('Album', $booktitle)
-   $metadata.setItemInfo('Genre', 'Audiobook')
+   $tagfile.Tag.Track = $i
+   $tagfile.Tag.AlbumArtists = $author
+   $tagfile.Tag.Artists = $author
+   $tagfile.Tag.Album = $booktitle
+   $tagfile.Tag.Genres = 'Audiobook'
+
    if($booktype -like "*IN*") {
-      $metadata.setItemInfo('Title', 'Intro')
+      $tagfile.Tag.Title = 'Intro'
    }
    elseif($booktype -like "*C*") {
       $chapter = $booktype.Split("C")[1]
-      $metadata.setItemInfo('Title', "Chapter ${chapter}")
+      $tagfile.Tag.Title = "Chapter ${chapter}"
    }
    elseif($booktype -like "*PR*") {
-      $metadata.setItemInfo('Title', 'Prologue')
+      $tagfile.Tag.Title = 'Prologue'
       if($firstPR) {
          $firstPR = $false
       } else {
@@ -47,17 +50,19 @@ foreach($file in $files) {
       }
    }
    elseif($booktype -like "*AN*") {
-      $metadata.setItemInfo('Title', "Author's Notes")
+      $tagfile.Tag.Title = "Author's Notes"
    }
    elseif($booktype -like "*AP*") {
-      $metadata.setItemInfo('Title', 'Appendix')
+      $tagfile.Tag.Title = 'Appendix'
    }
    elseif($booktype -like "*EP*") {
-      $metadata.setItemInfo('Title', 'EP')
+      $tagfile.Tag.Title = 'EP'
    }
    elseif($booktype -like "*FW*") {
-      $metadata.setItemInfo('Title', 'FW')
+      $tagfile.Tag.Title = 'FW'
    }
+   $tagfile.Save()
+
    Start-Sleep -s 1
    # Finally determine the new name and rename the file
    if($booktype -like "*IN*") {
